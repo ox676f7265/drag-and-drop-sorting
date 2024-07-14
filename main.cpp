@@ -53,13 +53,23 @@ protected:
             return;
         }
 
-        // группировка файлов по началу имени
+        // группировка файлов по имени исключая постфикс
         std::map<std::string, std::set<std::string>> groups;
         for (const QUrl &url : urls) {
             QString filePath = url.toLocalFile();
             QString fileName = QFileInfo(filePath).fileName();
-            std::string baseName = fileName.section('-', 0, 0).toLower().toStdString();
-            groups[baseName].insert(fileName.toStdString());
+            std::string fileNameStr = fileName.toStdString();
+
+            size_t pos = fileNameStr.find_last_of('-');
+            if (pos != std::string::npos) {
+                std::string baseName = fileNameStr.substr(0, pos);
+                for (char &c : baseName) { c = std::tolower(c); }
+                groups[baseName].insert(fileNameStr);
+            } else {
+                std::string baseName = fileNameStr;
+                for (char &c : baseName) { c = std::tolower(c); }
+                groups[baseName].insert(fileNameStr);
+            }
         }
 
         // обновление дерева
