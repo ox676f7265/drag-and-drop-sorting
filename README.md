@@ -7,5 +7,4 @@
 ```bash
 qmake main.pro
 make
-./main
 ```
