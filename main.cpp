@@ -55,27 +55,51 @@ protected:
 
         // группировка файлов по имени исключая постфикс
         std::map<std::string, std::set<std::string>> groups;
+        std::set<std::string> ungroupedFiles;
+
         for (const QUrl &url : urls) {
             QString filePath = url.toLocalFile();
             QString fileName = QFileInfo(filePath).fileName();
             std::string fileNameStr = fileName.toStdString();
 
-            size_t pos = fileNameStr.find_last_of('-');
+            size_t pos = fileNameStr.find_last_of("-");
+            std::string baseName;
             if (pos != std::string::npos) {
-                std::string baseName = fileNameStr.substr(0, pos);
-                for (char &c : baseName) { c = std::tolower(c); }
-                groups[baseName].insert(fileNameStr);
+                baseName = fileNameStr.substr(0, pos);
             } else {
-                std::string baseName = fileNameStr;
-                for (char &c : baseName) { c = std::tolower(c); }
-                groups[baseName].insert(fileNameStr);
+                baseName = fileNameStr.substr(0, fileNameStr.find_last_of('.'));
             }
+
+            for (char &c : baseName) {
+                c = std::tolower(static_cast<unsigned char>(c));
+            }
+            groups[baseName].insert(fileNameStr);
         }
 
         // обновление дерева
         for (const auto &group : groups) {
             std::string groupName = group.first;
             const std::set<std::string>& files = group.second;
+
+            bool hasBaseFile = false;
+            for (const std::string &file : files) {
+                if (file == groupName + ".jpg" || file == groupName + ".jpeg" || file == groupName + ".png") {
+                    hasBaseFile = true;
+                    break;
+                }
+            }
+
+            // если нет базового файла - несгруппировано
+            if (!hasBaseFile) {
+                ungroupedFiles.insert(files.begin(), files.end());
+                continue;
+            }
+
+            // если один файл или нет разделителя - несгруппировано
+            if (files.size() == 1 || groupName == *files.begin()) {
+                ungroupedFiles.insert(*files.begin());
+                continue;
+            }
 
             QTreeWidgetItem *groupItem = findGroupItem(QString::fromStdString(groupName));
             if (!groupItem) { // если groupItem == nullptr , создаётся элемент группы
@@ -94,6 +118,26 @@ protected:
 
             // обновление количества файлов в группе
             groupItem->setText(1, QString::number(groupItem->childCount()) + " файла(-ов)");
+        }
+
+        // группа несгруппировано
+        if (!ungroupedFiles.empty()) {
+            QTreeWidgetItem *ungroupedItem = findGroupItem("несгруппировано");
+            if (!ungroupedItem) {
+                ungroupedItem = new QTreeWidgetItem(treeWidget);
+                ungroupedItem->setText(0, "несгруппировано");
+                ungroupedItem->setText(1, QString::number(ungroupedFiles.size()) + " файла(-ов)");
+            }
+
+            for (const std::string &file : ungroupedFiles) {
+                if (!isFileAlreadyAdded(ungroupedItem, QString::fromStdString(file))) {
+                    QTreeWidgetItem *fileItem = new QTreeWidgetItem(ungroupedItem);
+                    fileItem->setText(0, "");
+                    fileItem->setText(1, QString::fromStdString(file));
+                }
+            }
+
+            ungroupedItem->setText(1, QString::number(ungroupedItem->childCount()) + " файла(-ов)");
         }
     }
 
